@@ -3,6 +3,9 @@ import cors from "cors";
 import "dotenv/config";
 import pool from "./db.js";
 import roadRoutes from "./routes/road.routes.js";
+import inspectionRoutes from "./routes/inspection.routes.js";
+import defectRoutes from "./routes/defect.routes.js";
+import uploadRoutes from "./routes/upload.routes.js";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -10,7 +13,15 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
+app.use("/uploads", express.static("uploads"));
+
 app.use("/api/roads", roadRoutes);
+
+app.use("/api/inspections", inspectionRoutes);
+
+app.use("/api/defects", defectRoutes);
+
+app.use("/api/upload", uploadRoutes);
 
 app.get("/api/health", async (req, res) => {
   try {

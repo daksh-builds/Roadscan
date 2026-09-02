@@ -1,0 +1,11 @@
+path: D:/my little programs/node/Projects/RoadScan/ai-service/datasets/road-defects
+
+train: train/images
+val: valid/images
+test: test/images
+
+names:
+  0: pothole
+  1: alligator-crack
+  2: longitudinal-crack
+  3: road-patch
