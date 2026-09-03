@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 4
+names: ['Alligator crack', 'Longitudinal crack', 'Pothole', 'Transverse crack']
+
+roboflow:
+  workspace: roaddamagerdd
+  project: road-damage-detection-pvgg0
+  version: 1
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/roaddamagerdd/road-damage-detection-pvgg0/dataset/1o

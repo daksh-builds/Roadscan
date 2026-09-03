@@ -28,17 +28,31 @@ env/
 ENV/
 *.venv
 
-# Uploads / Static Media Assets
+# Dataset files - DO NOT PUSH
+ai-service/datasets/road-defects/train/
+ai-service/datasets/road-defects/valid/
+ai-service/datasets/road-defects/test/
+
+# AI test images - DO NOT PUSH
+ai-service/test_images/
+
+# AI runtime uploads - DO NOT PUSH
+ai-service/ai_uploads/
+
+# Backend runtime uploads - DO NOT PUSH
 uploads/
 backend/uploads/
-ai-service/uploads/
+
+# Training outputs - DO NOT PUSH
+runs/
+weights/
 
 # Database / Storage files
 *.sqlite
 *.db
 
 # Logs
-logs
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*

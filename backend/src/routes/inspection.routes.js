@@ -1,8 +1,12 @@
 import express from "express";
 import pool from "../db.js";
+
+import { calculateSeverity } from "../services/severity.service.js";
+import { calculatePriority } from "../services/priority.service.js";
 import { detectDefects } from "../services/ai.service.js";
 
 const router = express.Router();
+
 
 // GET /api/inspections
 router.get("/", async (req, res) => {
@@ -20,6 +24,7 @@ router.get("/", async (req, res) => {
       success: true,
       inspections: result.rows,
     });
+
   } catch (error) {
     console.error("Error fetching inspections:", error);
 
@@ -29,6 +34,7 @@ router.get("/", async (req, res) => {
     });
   }
 });
+
 
 // POST /api/inspections
 router.post("/", async (req, res) => {
@@ -47,8 +53,9 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // 1. Save inspection in database
-    const result = await pool.query(
+
+    // 1. Create inspection
+    const inspectionResult = await pool.query(
       `INSERT INTO inspections
        (road_id, image_path, latitude, longitude)
        VALUES ($1, $2, $3, $4)
@@ -61,20 +68,86 @@ router.post("/", async (req, res) => {
       ]
     );
 
-    // 2. Convert URL path to actual filesystem path
+    const inspection = inspectionResult.rows[0];
+
+
+    // 2. Convert URL path to filesystem path
     const actualImagePath = image_path.startsWith("/")
       ? image_path.slice(1)
       : image_path;
+
 
     // 3. Send image to AI service
     const aiResult = await detectDefects(actualImagePath);
 
 
-    // 4. Return inspection + AI result
+    // 4. Calculate severity + priority
+    // 5. Save defects
+    const savedDefects = [];
+
+    for (const detection of aiResult.detections) {
+
+      const severity = calculateSeverity(detection);
+
+      const {
+        priority_score,
+        priority
+      } = calculatePriority(
+        severity,
+        detection.confidence
+      );
+
+
+      const defectResult = await pool.query(
+        `
+        INSERT INTO defects
+        (
+          inspection_id,
+          defect_type,
+          confidence,
+          severity,
+          priority_score,
+          latitude,
+          longitude,
+          status
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        RETURNING *
+        `,
+        [
+          inspection.id,
+          detection.defect_type,
+          detection.confidence,
+          severity,
+          priority_score,
+          latitude || null,
+          longitude || null,
+          "detected",
+        ]
+      );
+
+
+      savedDefects.push({
+        ...defectResult.rows[0],
+        bbox: detection.bbox,
+        area: detection.area,
+        priority,
+      });
+    }
+
+
+    // 6. Final response
     res.status(201).json({
       success: true,
-      inspection: result.rows[0],
-      ai_result: aiResult,
+
+      inspection,
+
+      ai_result: {
+        success: true,
+        detections: aiResult.detections,
+      },
+
+      defects: savedDefects,
     });
 
   } catch (error) {
@@ -86,5 +159,6 @@ router.post("/", async (req, res) => {
     });
   }
 });
+
 
 export default router;
