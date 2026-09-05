@@ -134,7 +134,14 @@ router.post("/", async (req, res) => {
         priority,
       });
     }
+await pool.query(
+  `UPDATE inspections
+   SET status = 'completed'
+   WHERE id = $1`,
+  [inspection.id]
+);
 
+inspection.status = "completed";
 
     // 6. Final response
     res.status(201).json({
@@ -150,14 +157,14 @@ router.post("/", async (req, res) => {
       defects: savedDefects,
     });
 
-  } catch (error) {
-    console.error("Error creating inspection:", error);
+ } catch (error) {
+  console.error("Error creating inspection:", error);
 
-    res.status(500).json({
-      success: false,
-      message: "Failed to create inspection",
-    });
-  }
+  res.status(500).json({
+    success: false,
+    message: "Failed to create inspection",
+  });
+}
 });
 
 

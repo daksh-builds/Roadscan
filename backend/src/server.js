@@ -6,6 +6,7 @@ import roadRoutes from "./routes/road.routes.js";
 import inspectionRoutes from "./routes/inspection.routes.js";
 import defectRoutes from "./routes/defect.routes.js";
 import uploadRoutes from "./routes/upload.routes.js";
+import repairRoutes from "./routes/repair.routes.js";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -22,6 +23,8 @@ app.use("/api/inspections", inspectionRoutes);
 app.use("/api/defects", defectRoutes);
 
 app.use("/api/upload", uploadRoutes);
+
+app.use("/api/repairs", repairRoutes);
 
 app.get("/api/health", async (req, res) => {
   try {

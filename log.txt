@@ -3,20 +3,9 @@ import pool from "../db.js";
 
 const router = express.Router();
 
-// GET defects for a specific inspection
-// GET /api/defects/inspection/:inspectionId
 router.get("/inspection/:inspectionId", async (req, res) => {
   try {
     const { inspectionId } = req.params;
-
-    const inspectionIdNumber = Number(inspectionId);
-
-    if (!Number.isInteger(inspectionIdNumber)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid inspection ID",
-      });
-    }
 
     const result = await pool.query(
       `
@@ -24,8 +13,6 @@ router.get("/inspection/:inspectionId", async (req, res) => {
         d.*,
         i.image_path,
         i.road_id,
-        i.latitude AS inspection_latitude,
-        i.longitude AS inspection_longitude,
         r.name AS road_name
       FROM defects d
       JOIN inspections i
@@ -33,16 +20,15 @@ router.get("/inspection/:inspectionId", async (req, res) => {
       LEFT JOIN roads r
         ON i.road_id = r.id
       WHERE d.inspection_id = $1
-      ORDER BY d.priority_score DESC, d.created_at DESC
+      ORDER BY d.priority_score DESC
       `,
-      [inspectionIdNumber]
+      [inspectionId]
     );
 
     res.json({
       success: true,
       defects: result.rows,
     });
-
   } catch (error) {
     console.error("Error fetching inspection defects:", error);
 
@@ -53,34 +39,24 @@ router.get("/inspection/:inspectionId", async (req, res) => {
   }
 });
 
-
-// GET all defects
 // GET /api/defects
 router.get("/", async (req, res) => {
   try {
     const result = await pool.query(
-      `
-      SELECT
-        d.*,
-        i.image_path,
-        i.road_id,
-        i.latitude AS inspection_latitude,
-        i.longitude AS inspection_longitude,
-        r.name AS road_name
-      FROM defects d
-      JOIN inspections i
-        ON d.inspection_id = i.id
-      LEFT JOIN roads r
-        ON i.road_id = r.id
-      ORDER BY d.created_at DESC
-      `
+      `SELECT
+         d.*,
+         i.image_path,
+         r.name AS road_name
+       FROM defects d
+       JOIN inspections i ON d.inspection_id = i.id
+       LEFT JOIN roads r ON i.road_id = r.id
+       ORDER BY d.created_at DESC`
     );
 
     res.json({
       success: true,
       defects: result.rows,
     });
-
   } catch (error) {
     console.error("Error fetching defects:", error);
 
@@ -91,8 +67,6 @@ router.get("/", async (req, res) => {
   }
 });
 
-
-// POST create defect
 // POST /api/defects
 router.post("/", async (req, res) => {
   try {
@@ -114,28 +88,26 @@ router.post("/", async (req, res) => {
     }
 
     const result = await pool.query(
-      `
-      INSERT INTO defects
-      (
-        inspection_id,
-        defect_type,
-        confidence,
-        severity,
-        priority_score,
-        latitude,
-        longitude
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
-      RETURNING *
-      `,
+      `INSERT INTO defects
+       (
+         inspection_id,
+         defect_type,
+         confidence,
+         severity,
+         priority_score,
+         latitude,
+         longitude
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING *`,
       [
         inspection_id,
         defect_type,
-        confidence ?? null,
-        severity ?? null,
-        priority_score ?? null,
-        latitude ?? null,
-        longitude ?? null,
+        confidence || null,
+        severity || null,
+        priority_score || null,
+        latitude || null,
+        longitude || null,
       ]
     );
 
@@ -143,7 +115,6 @@ router.post("/", async (req, res) => {
       success: true,
       defect: result.rows[0],
     });
-
   } catch (error) {
     console.error("Error creating defect:", error);
 
@@ -153,6 +124,5 @@ router.post("/", async (req, res) => {
     });
   }
 });
-
 
 export default router;
