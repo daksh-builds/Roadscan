@@ -1,6 +1,5 @@
 "use client";
 import dynamic from "next/dynamic";
-import { getRepairStats} from "../../lib/api";
 const RoadMap = dynamic(
   () => import("../../components/RoadMap"),
   {
@@ -27,7 +26,8 @@ import {
   getDefects,
   uploadImage,
   createInspection,
-  getImageUrl,
+  getNearbyRoads,
+  saveOSMRoad,
 } from "../../lib/api";
 
 type Road = {
@@ -36,6 +36,16 @@ type Road = {
   road_type?: string;
   latitude?: number;
   longitude?: number;
+};
+
+type NearbyRoad = {
+  osm_id: number;
+  name: string;
+  road_type?: string | null;
+  geometry?: {
+    latitude: number;
+    longitude: number;
+  }[];
 };
 
 type Inspection = {
@@ -62,6 +72,9 @@ type Defect = {
 
 export default function Dashboard() {
   const [roads, setRoads] = useState<Road[]>([]);
+  const [nearbyRoads, setNearbyRoads] = useState<NearbyRoad[]>([]);
+  const [roadsLoading, setRoadsLoading] = useState(false);
+
   const [inspections, setInspections] = useState<
     Inspection[]
   >([]);
@@ -127,6 +140,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadDashboard();
+    getLocation();
   }, []);
 
   function handleFileChange(
@@ -147,19 +161,21 @@ export default function Dashboard() {
     setPreview(imageUrl);
   }
 
-  function getLocation() {
+  async function getLocation() {
     setLocationStatus("Getting your location...");
+    setRoadsLoading(true);
+    setError(null);
 
     if (!navigator.geolocation) {
       setLocationStatus(
         "Geolocation is not supported by this browser."
       );
-
+      setRoadsLoading(false);
       return;
     }
 
     navigator.geolocation.getCurrentPosition(
-      (position) => {
+      async (position) => {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
 
@@ -167,10 +183,36 @@ export default function Dashboard() {
         setLongitude(lng);
 
         setLocationStatus(
-          `Location detected: ${lat.toFixed(
-            5
-          )}, ${lng.toFixed(5)}`
+          `Location detected: ${lat.toFixed(5)}, ${lng.toFixed(5)}`
         );
+
+        try {
+          const result = await getNearbyRoads(lat, lng);
+
+          setNearbyRoads(result.roads || []);
+
+          if (!result.roads || result.roads.length === 0) {
+            setLocationStatus(
+              "Location detected, but no nearby mapped roads were found."
+            );
+          } else {
+            setLocationStatus(
+              `${result.roads.length} nearby roads found.`
+            );
+          }
+        } catch (err) {
+          console.error(err);
+
+          setNearbyRoads([]);
+          setError(
+            "Location detected, but nearby roads could not be loaded."
+          );
+          setLocationStatus(
+            "Location detected, but road search failed."
+          );
+        } finally {
+          setRoadsLoading(false);
+        }
       },
       (geoError) => {
         console.error(geoError);
@@ -181,6 +223,8 @@ export default function Dashboard() {
 
         setLatitude(null);
         setLongitude(null);
+        setNearbyRoads([]);
+        setRoadsLoading(false);
       },
       {
         enableHighAccuracy: true,
@@ -219,10 +263,37 @@ export default function Dashboard() {
         );
       }
 
-      // 2. Create inspection
+      // 2. Find selected OSM road
+      const selectedOSMRoad = nearbyRoads.find(
+        (road) =>
+          String(road.osm_id) === String(selectedRoad)
+      );
+
+      if (!selectedOSMRoad) {
+        throw new Error("Selected road could not be found.");
+      }
+
+      // 3. Save/find road in ROADSCAN database
+      const roadResult = await saveOSMRoad({
+        osm_id: selectedOSMRoad.osm_id,
+        name: selectedOSMRoad.name,
+        road_type: selectedOSMRoad.road_type,
+        latitude,
+        longitude,
+      });
+
+      const roadId = roadResult.road?.id;
+
+      if (!roadId) {
+        throw new Error(
+          "Backend did not return a ROADSCAN road ID."
+        );
+      }
+
+      // 4. Create inspection
       const inspectionResult =
         await createInspection({
-          road_id: Number(selectedRoad),
+          road_id: roadId,
           image_path: imagePath,
           latitude,
           longitude,
@@ -394,36 +465,51 @@ export default function Dashboard() {
               {/* Road */}
               <div>
                 <label className="mb-2 block text-sm font-medium">
-                  Select Road
+                  Select Nearby Road
                 </label>
 
                 <select
                   value={selectedRoad}
                   onChange={(event) =>
-                    setSelectedRoad(
-                      event.target.value
-                    )
+                    setSelectedRoad(event.target.value)
                   }
-                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm outline-none focus:border-blue-500"
+                  disabled={roadsLoading}
+                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <option value="">
-                    Select a road
+                    {roadsLoading
+                      ? "Finding nearby roads..."
+                      : "Select a road"}
                   </option>
 
-                  {roads.map((road) => (
+                  {nearbyRoads.map((road) => (
                     <option
-                      key={road.id}
-                      value={road.id}
+                      key={road.osm_id}
+                      value={road.osm_id}
                     >
                       {road.name}
                     </option>
                   ))}
                 </select>
 
-                {roads.length === 0 && (
-                  <p className="mt-2 text-xs text-yellow-400">
-                    No roads found. Create a road
-                    through the Roads API first.
+                {roadsLoading && (
+                  <p className="mt-2 text-xs text-slate-500">
+                    📍 Searching OpenStreetMap for nearby roads...
+                  </p>
+                )}
+
+                {!roadsLoading &&
+                  latitude !== null &&
+                  nearbyRoads.length === 0 && (
+                    <p className="mt-2 text-xs text-yellow-400">
+                      No mapped roads found near your current location.
+                    </p>
+                  )}
+
+                {!roadsLoading && nearbyRoads.length > 0 && (
+                  <p className="mt-2 text-xs text-green-400">
+                    ✓ {nearbyRoads.length} nearby mapped road
+                    {nearbyRoads.length !== 1 ? "s" : ""} found
                   </p>
                 )}
               </div>
@@ -909,3 +995,4 @@ function Metric({
     </div>
   );
 }
+
