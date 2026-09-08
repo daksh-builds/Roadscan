@@ -73,12 +73,13 @@ router.get("/nearby", async (req, res) => {
       });
     }
 
-    const radius = 5000;
+    // 2 km is enough for nearby road discovery
+    const radius = 2000;
 
     const query = `
-      [out:json][timeout:60];
+      [out:json][timeout:30];
 
-      way["highway"](
+      way["highway"~"motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street"](
         around:${radius},
         ${lat},
         ${lon}
@@ -97,7 +98,7 @@ router.get("/nearby", async (req, res) => {
 
     for (const server of overpassServers) {
       try {
-        console.log(`Trying Overpass server: ${server}`);
+        console.log(`Trying Overpass: ${server}`);
 
         response = await fetch(server, {
           method: "POST",
@@ -118,8 +119,7 @@ router.get("/nearby", async (req, res) => {
         );
       } catch (error) {
         console.log(
-          `Overpass error: ${server}`,
-          error.message
+          `Overpass error: ${server} -> ${error.message}`
         );
       }
     }
@@ -151,7 +151,7 @@ router.get("/nearby", async (req, res) => {
         };
       });
 
-    console.log(`Found ${roads.length} OSM roads`);
+    console.log(`Found ${roads.length} nearby OSM roads`);
 
     res.json({
       success: true,
