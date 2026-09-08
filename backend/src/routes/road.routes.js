@@ -81,17 +81,35 @@ router.get("/nearby", async (req, res) => {
       out geom;
     `;
 
-    const response = await fetch(
-      "https://overpass-api.de/api/interpreter",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          "User-Agent": "ROADSCAN/1.0",
-        },
-        body: `data=${encodeURIComponent(query)}`,
-      }
-    );
+   const overpassServers = [
+  "https://overpass.kumi.systems/api/interpreter",
+  "https://overpass-api.de/api/interpreter",
+];
+
+let response;
+
+for (const server of overpassServers) {
+  try {
+    response = await fetch(server, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent": "ROADSCAN/1.0",
+      },
+      body: `data=${encodeURIComponent(query)}`,
+    });
+
+    if (response.ok) break;
+
+    console.log(`Overpass ${server} failed: ${response.status}`);
+  } catch (error) {
+    console.log(`Overpass ${server} failed:`, error.message);
+  }
+}
+
+if (!response || !response.ok) {
+  throw new Error("All Overpass API servers failed");
+}
 
     if (!response.ok) {
       const errorText = await response.text();
