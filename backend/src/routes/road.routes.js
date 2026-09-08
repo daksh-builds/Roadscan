@@ -73,11 +73,10 @@ router.get("/nearby", async (req, res) => {
       });
     }
 
-    // Search roads within 3 km
-    const radius = 3000;
+    const radius = 5000;
 
     const query = `
-      [out:json][timeout:25];
+      [out:json][timeout:60];
 
       way["highway"](
         around:${radius},
@@ -89,6 +88,7 @@ router.get("/nearby", async (req, res) => {
     `;
 
     const overpassServers = [
+      "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
       "https://overpass.kumi.systems/api/interpreter",
       "https://overpass-api.de/api/interpreter",
     ];
@@ -97,6 +97,8 @@ router.get("/nearby", async (req, res) => {
 
     for (const server of overpassServers) {
       try {
+        console.log(`Trying Overpass server: ${server}`);
+
         response = await fetch(server, {
           method: "POST",
           headers: {
@@ -107,15 +109,16 @@ router.get("/nearby", async (req, res) => {
         });
 
         if (response.ok) {
+          console.log(`Overpass success: ${server}`);
           break;
         }
 
         console.log(
-          `Overpass ${server} failed: ${response.status}`
+          `Overpass failed: ${server} -> ${response.status}`
         );
       } catch (error) {
         console.log(
-          `Overpass ${server} failed:`,
+          `Overpass error: ${server}`,
           error.message
         );
       }
@@ -141,13 +144,14 @@ router.get("/nearby", async (req, res) => {
           osm_id: element.id,
           name: tags.name || "Unnamed Road",
           road_type: tags.highway || null,
-
           geometry: element.geometry.map((point) => ({
             latitude: point.lat,
             longitude: point.lon,
           })),
         };
       });
+
+    console.log(`Found ${roads.length} OSM roads`);
 
     res.json({
       success: true,
