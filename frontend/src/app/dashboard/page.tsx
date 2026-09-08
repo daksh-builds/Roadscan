@@ -160,80 +160,146 @@ export default function Dashboard() {
 
     setPreview(imageUrl);
   }
+function formatRoadType(type: string | null | undefined) {
+  if (!type) return "Road";
 
-  async function getLocation() {
-    setLocationStatus("Getting your location...");
-    setRoadsLoading(true);
-    setError(null);
+  const names: Record<string, string> = {
+    motorway: "Motorway",
+    trunk: "Trunk Road",
+    primary: "Primary Road",
+    secondary: "Secondary Road",
+    tertiary: "Tertiary Road",
+    residential: "Residential Road",
+    living_street: "Living Street",
+    unclassified: "Road",
+    service: "Service Road",
+  };
 
-    if (!navigator.geolocation) {
-      setLocationStatus(
-        "Geolocation is not supported by this browser."
-      );
-      setRoadsLoading(false);
-      return;
-    }
+  return names[type] || "Road";
+}
+async function getLocation() {
+  setLocationStatus("Getting your location...");
+  setRoadsLoading(true);
+  setError(null);
 
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const lat = position.coords.latitude;
-        const lng = position.coords.longitude;
-
-        setLatitude(lat);
-        setLongitude(lng);
-
-        setLocationStatus(
-          `Location detected: ${lat.toFixed(5)}, ${lng.toFixed(5)}`
-        );
-
-        try {
-          const result = await getNearbyRoads(lat, lng);
-
-          setNearbyRoads(result.roads || []);
-
-          if (!result.roads || result.roads.length === 0) {
-            setLocationStatus(
-              "Location detected, but no nearby mapped roads were found."
-            );
-          } else {
-            setLocationStatus(
-              `${result.roads.length} nearby roads found.`
-            );
-          }
-        } catch (err) {
-          console.error(err);
-
-          setNearbyRoads([]);
-          setError(
-            "Location detected, but nearby roads could not be loaded."
-          );
-          setLocationStatus(
-            "Location detected, but road search failed."
-          );
-        } finally {
-          setRoadsLoading(false);
-        }
-      },
-      (geoError) => {
-        console.error(geoError);
-
-        setLocationStatus(
-          "Unable to get location. Please allow location access."
-        );
-
-        setLatitude(null);
-        setLongitude(null);
-        setNearbyRoads([]);
-        setRoadsLoading(false);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0,
-      }
+  if (!navigator.geolocation) {
+    setLocationStatus(
+      "Geolocation is not supported by this browser."
     );
+    setRoadsLoading(false);
+    return;
   }
 
+  navigator.geolocation.getCurrentPosition(
+    async (position) => {
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+
+      setLatitude(lat);
+      setLongitude(lng);
+
+      setLocationStatus(
+        `Location detected: ${lat.toFixed(5)}, ${lng.toFixed(5)}`
+      );
+
+      try {
+        setLocationStatus(
+          "Searching OpenStreetMap for nearby roads..."
+        );
+
+        const result = await getNearbyRoads(lat, lng);
+
+        const allRoads = Array.isArray(result?.roads)
+          ? result.roads
+          : [];
+
+        /*
+         * OSM can contain many separate way segments
+         * belonging to the same physical road.
+         *
+         * Prefer useful OSM names/references.
+         */
+        const processedRoads = allRoads.map((road: any) => {
+          const displayName =
+            road.name &&
+            road.name !== "Unnamed Road" &&
+            road.name !== "Unnamed"
+              ? road.name
+              : road.official_name ||
+                road.ref ||
+                road.alt_name ||
+                road.loc_name ||
+                `${formatRoadType(road.road_type)} • OSM ${road.osm_id}`;
+
+          return {
+            ...road,
+            name: displayName,
+          };
+        });
+
+        /*
+         * Remove duplicate road names.
+         * Keep the first OSM segment for each road.
+         */
+        const uniqueRoads = Array.from(
+          new Map(
+            processedRoads.map((road: any) => [
+              road.name,
+              road,
+            ])
+          ).values()
+        );
+
+        setNearbyRoads(uniqueRoads);
+
+        if (uniqueRoads.length === 0) {
+          setLocationStatus(
+            "Location detected, but no nearby mapped roads were found."
+          );
+        } else {
+          setLocationStatus(
+            `${uniqueRoads.length} nearby mapped roads found.`
+          );
+        }
+      } catch (err) {
+        console.error("Nearby road search failed:", err);
+
+        setNearbyRoads([]);
+
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Nearby roads could not be loaded."
+        );
+
+        setLocationStatus(
+          "Location detected, but road search failed."
+        );
+      } finally {
+        setRoadsLoading(false);
+      }
+    },
+
+    (geoError) => {
+      console.error("GPS error:", geoError);
+
+      setLocationStatus(
+        "Unable to get location. Please allow location access."
+      );
+
+      setLatitude(null);
+      setLongitude(null);
+      setNearbyRoads([]);
+      setRoadsLoading(false);
+    },
+
+    {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0,
+    }
+  );
+}
   async function handleCreateInspection() {
     if (!selectedFile) {
       setError("Please select a road image first.");
