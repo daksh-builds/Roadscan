@@ -19,46 +19,68 @@ export async function getNearbyRoads(
   latitude: number,
   longitude: number
 ) {
-  const url =
-    `${API_URL}/api/roads/nearby` +
-    `?latitude=${encodeURIComponent(latitude)}` +
-    `&longitude=${encodeURIComponent(longitude)}`;
+  // Around 2 km
+  const radius = 2000;
 
-  const controller = new AbortController();
+  const query = `
+    [out:json][timeout:20];
 
-  // Never allow the UI to stay stuck forever
-  const timeout = setTimeout(() => {
-    controller.abort();
-  }, 15000);
+    way["highway"~"motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street|service"](
+      around:${radius},
+      ${latitude},
+      ${longitude}
+    );
 
-  try {
-    const response = await fetch(url, {
-      method: "GET",
-      signal: controller.signal,
+    out geom;
+  `;
+
+  const response = await fetch(
+    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: `data=${encodeURIComponent(query)}`,
       cache: "no-store",
+    }
+  );
+
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(
+      `OpenStreetMap search failed (${response.status})`
+    );
+  }
+
+  const roads = (data?.elements || [])
+    .filter(
+      (element: any) =>
+        element.type === "way" &&
+        Array.isArray(element.geometry) &&
+        element.geometry.length > 1
+    )
+    .map((element: any) => {
+      const tags = element.tags || {};
+
+      return {
+        osm_id: element.id,
+        name: tags.name || "Unnamed Road",
+        road_type: tags.highway || null,
+        geometry: element.geometry.map((point: any) => ({
+          latitude: point.lat,
+          longitude: point.lon,
+        })),
+      };
     });
 
-    const data = await response.json().catch(() => null);
-
-    if (!response.ok) {
-      throw new Error(
-        data?.message ||
-          `Failed to fetch nearby roads (${response.status})`
-      );
-    }
-
-    return data;
-  } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") {
-      throw new Error(
-        "Nearby road search timed out. Please try again."
-      );
-    }
-
-    throw error;
-  } finally {
-    clearTimeout(timeout);
-  }
+  return {
+    success: true,
+    latitude,
+    longitude,
+    roads,
+  };
 }
 
 export async function saveOSMRoad(road: {

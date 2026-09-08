@@ -73,85 +73,133 @@ router.get("/nearby", async (req, res) => {
       });
     }
 
-    // 2 km is enough for nearby road discovery
-    const radius = 2000;
+    // Search area: approximately 2 km around user's location
+    const delta = 0.02;
 
-    const query = `
-      [out:json][timeout:30];
+    const minLat = lat - delta;
+    const maxLat = lat + delta;
+    const minLon = lon - delta;
+    const maxLon = lon + delta;
 
-      way["highway"~"motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street"](
-        around:${radius},
-        ${lat},
-        ${lon}
+    const bbox = `${minLat},${minLon},${maxLat},${maxLon}`;
+
+    const osmUrl =
+      `https://api.openstreetmap.org/api/0.6/map?bbox=${bbox}`;
+
+    console.log("Fetching roads from OpenStreetMap:", osmUrl);
+
+    const response = await fetch(osmUrl, {
+      headers: {
+        "User-Agent": "ROADSCAN/1.0",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `OpenStreetMap API failed: ${response.status}`
       );
+    }
 
-      out geom;
-    `;
+    const xml = await response.text();
 
-    const overpassServers = [
-      "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
-      "https://overpass.kumi.systems/api/interpreter",
-      "https://overpass-api.de/api/interpreter",
-    ];
+    // Parse XML
+    const { DOMParser } = await import("@xmldom/xmldom");
 
-    let response = null;
+    const doc = new DOMParser().parseFromString(xml, "text/xml");
 
-    for (const server of overpassServers) {
-      try {
-        console.log(`Trying Overpass: ${server}`);
+    // -----------------------------
+    // Parse nodes
+    // -----------------------------
 
-        response = await fetch(server, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-            "User-Agent": "ROADSCAN/1.0",
-          },
-          body: `data=${encodeURIComponent(query)}`,
+    const nodes = new Map();
+
+    const nodeElements = doc.getElementsByTagName("node");
+
+    for (let i = 0; i < nodeElements.length; i++) {
+      const node = nodeElements[i];
+
+      const id = node.getAttribute("id");
+      const latitude = Number(node.getAttribute("lat"));
+      const longitude = Number(node.getAttribute("lon"));
+
+      if (id) {
+        nodes.set(id, {
+          latitude,
+          longitude,
         });
-
-        if (response.ok) {
-          console.log(`Overpass success: ${server}`);
-          break;
-        }
-
-        console.log(
-          `Overpass failed: ${server} -> ${response.status}`
-        );
-      } catch (error) {
-        console.log(
-          `Overpass error: ${server} -> ${error.message}`
-        );
       }
     }
 
-    if (!response || !response.ok) {
-      throw new Error("All Overpass API servers failed");
+    // -----------------------------
+    // Parse roads (ways)
+    // -----------------------------
+
+    const wayElements = doc.getElementsByTagName("way");
+
+    const roads = [];
+
+    const allowedHighways = new Set([
+      "motorway",
+      "trunk",
+      "primary",
+      "secondary",
+      "tertiary",
+      "unclassified",
+      "residential",
+      "living_street",
+      "service",
+    ]);
+
+    for (let i = 0; i < wayElements.length; i++) {
+      const way = wayElements[i];
+
+      const tags = {};
+      const tagElements = way.getElementsByTagName("tag");
+
+      for (let j = 0; j < tagElements.length; j++) {
+        const tag = tagElements[j];
+
+        const key = tag.getAttribute("k");
+        const value = tag.getAttribute("v");
+
+        if (key) {
+          tags[key] = value;
+        }
+      }
+
+      // Only roads
+      if (!allowedHighways.has(tags.highway)) {
+        continue;
+      }
+
+      // Get road geometry
+      const ndElements = way.getElementsByTagName("nd");
+
+      const geometry = [];
+
+      for (let j = 0; j < ndElements.length; j++) {
+        const ref = ndElements[j].getAttribute("ref");
+
+        const node = nodes.get(ref);
+
+        if (node) {
+          geometry.push(node);
+        }
+      }
+
+      if (geometry.length < 2) {
+        continue;
+      }
+
+      roads.push({
+        osm_id: Number(way.getAttribute("id")),
+        name: tags.name || "Unnamed Road",
+        road_type: tags.highway,
+        geometry,
+      });
     }
 
-    const data = await response.json();
-
-    const roads = (data.elements || [])
-      .filter(
-        (element) =>
-          element.type === "way" &&
-          element.geometry &&
-          element.geometry.length > 1
-      )
-      .map((element) => {
-        const tags = element.tags || {};
-
-        return {
-          osm_id: element.id,
-          name: tags.name || "Unnamed Road",
-          road_type: tags.highway || null,
-          geometry: element.geometry.map((point) => ({
-            latitude: point.lat,
-            longitude: point.lon,
-          })),
-        };
-      });
-
-    console.log(`Found ${roads.length} nearby OSM roads`);
+    console.log(`Found ${roads.length} OSM roads`);
 
     res.json({
       success: true,
