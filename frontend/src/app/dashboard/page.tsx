@@ -161,78 +161,91 @@ export default function Dashboard() {
     setPreview(imageUrl);
   }
 
-  async function getLocation() {
-    setLocationStatus("Getting your location...");
-    setRoadsLoading(true);
-    setError(null);
+async function getLocation() {
+  setLocationStatus("Getting your location...");
+  setRoadsLoading(true);
+  setError(null);
 
-    if (!navigator.geolocation) {
-      setLocationStatus(
-        "Geolocation is not supported by this browser."
-      );
-      setRoadsLoading(false);
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const lat = position.coords.latitude;
-        const lng = position.coords.longitude;
-
-        setLatitude(lat);
-        setLongitude(lng);
-
-        setLocationStatus(
-          `Location detected: ${lat.toFixed(5)}, ${lng.toFixed(5)}`
-        );
-
-        try {
-          const result = await getNearbyRoads(lat, lng);
-
-          setNearbyRoads(result.roads || []);
-
-          if (!result.roads || result.roads.length === 0) {
-            setLocationStatus(
-              "Location detected, but no nearby mapped roads were found."
-            );
-          } else {
-            setLocationStatus(
-              `${result.roads.length} nearby roads found.`
-            );
-          }
-        } catch (err) {
-          console.error(err);
-
-          setNearbyRoads([]);
-          setError(
-            "Location detected, but nearby roads could not be loaded."
-          );
-          setLocationStatus(
-            "Location detected, but road search failed."
-          );
-        } finally {
-          setRoadsLoading(false);
-        }
-      },
-      (geoError) => {
-        console.error(geoError);
-
-        setLocationStatus(
-          "Unable to get location. Please allow location access."
-        );
-
-        setLatitude(null);
-        setLongitude(null);
-        setNearbyRoads([]);
-        setRoadsLoading(false);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0,
-      }
+  if (!navigator.geolocation) {
+    setLocationStatus(
+      "Geolocation is not supported by this browser."
     );
+    setRoadsLoading(false);
+    return;
   }
+
+  navigator.geolocation.getCurrentPosition(
+    async (position) => {
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+
+      setLatitude(lat);
+      setLongitude(lng);
+
+      setLocationStatus(
+        `Location detected: ${lat.toFixed(5)}, ${lng.toFixed(5)}`
+      );
+
+      try {
+        setLocationStatus(
+          "Searching OpenStreetMap for nearby roads..."
+        );
+
+        const result = await getNearbyRoads(lat, lng);
+
+        const roads = Array.isArray(result?.roads)
+          ? result.roads
+          : [];
+
+        setNearbyRoads(roads);
+
+        if (roads.length === 0) {
+          setLocationStatus(
+            "Location detected, but no nearby mapped roads were found."
+          );
+        } else {
+          setLocationStatus(
+            `${roads.length} nearby mapped roads found.`
+          );
+        }
+      } catch (err) {
+        console.error("Nearby road search failed:", err);
+
+        setNearbyRoads([]);
+
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Nearby roads could not be loaded."
+        );
+
+        setLocationStatus(
+          "Location detected, but road search failed."
+        );
+      } finally {
+        // THIS MUST ALWAYS RUN
+        setRoadsLoading(false);
+      }
+    },
+    (geoError) => {
+      console.error("GPS error:", geoError);
+
+      setLocationStatus(
+        "Unable to get location. Please allow location access."
+      );
+
+      setLatitude(null);
+      setLongitude(null);
+      setNearbyRoads([]);
+      setRoadsLoading(false);
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0,
+    }
+  );
+}
 
   async function handleCreateInspection() {
     if (!selectedFile) {

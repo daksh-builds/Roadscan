@@ -24,18 +24,41 @@ export async function getNearbyRoads(
     `?latitude=${encodeURIComponent(latitude)}` +
     `&longitude=${encodeURIComponent(longitude)}`;
 
-  const response = await fetch(url);
+  const controller = new AbortController();
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => null);
+  // Never allow the UI to stay stuck forever
+  const timeout = setTimeout(() => {
+    controller.abort();
+  }, 15000);
 
-    throw new Error(
-      errorData?.message ||
-        `Failed to fetch nearby roads (${response.status})`
-    );
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      signal: controller.signal,
+      cache: "no-store",
+    });
+
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      throw new Error(
+        data?.message ||
+          `Failed to fetch nearby roads (${response.status})`
+      );
+    }
+
+    return data;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error(
+        "Nearby road search timed out. Please try again."
+      );
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeout);
   }
-
-  return response.json();
 }
 
 export async function saveOSMRoad(road: {
