@@ -73,83 +73,81 @@ router.get("/nearby", async (req, res) => {
       });
     }
 
-    const radius = 1000;
+    // Search roads within 3 km
+    const radius = 3000;
 
     const query = `
       [out:json][timeout:25];
-      way["highway"]["name"](around:${radius},${lat},${lon});
+
+      way["highway"](
+        around:${radius},
+        ${lat},
+        ${lon}
+      );
+
       out geom;
     `;
 
-   const overpassServers = [
-  "https://overpass.kumi.systems/api/interpreter",
-  "https://overpass-api.de/api/interpreter",
-];
+    const overpassServers = [
+      "https://overpass.kumi.systems/api/interpreter",
+      "https://overpass-api.de/api/interpreter",
+    ];
 
-let response;
+    let response = null;
 
-for (const server of overpassServers) {
-  try {
-    response = await fetch(server, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "User-Agent": "ROADSCAN/1.0",
-      },
-      body: `data=${encodeURIComponent(query)}`,
-    });
+    for (const server of overpassServers) {
+      try {
+        response = await fetch(server, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": "ROADSCAN/1.0",
+          },
+          body: `data=${encodeURIComponent(query)}`,
+        });
 
-    if (response.ok) break;
+        if (response.ok) {
+          break;
+        }
 
-    console.log(`Overpass ${server} failed: ${response.status}`);
-  } catch (error) {
-    console.log(`Overpass ${server} failed:`, error.message);
-  }
-}
+        console.log(
+          `Overpass ${server} failed: ${response.status}`
+        );
+      } catch (error) {
+        console.log(
+          `Overpass ${server} failed:`,
+          error.message
+        );
+      }
+    }
 
-if (!response || !response.ok) {
-  throw new Error("All Overpass API servers failed");
-}
-
-    if (!response.ok) {
-      const errorText = await response.text();
-
-      console.error(
-        "Overpass error:",
-        response.status,
-        errorText
-      );
-
-      throw new Error(
-        `Overpass API error: ${response.status}`
-      );
+    if (!response || !response.ok) {
+      throw new Error("All Overpass API servers failed");
     }
 
     const data = await response.json();
 
-    const roadsMap = new Map();
+    const roads = (data.elements || [])
+      .filter(
+        (element) =>
+          element.type === "way" &&
+          element.geometry &&
+          element.geometry.length > 1
+      )
+      .map((element) => {
+        const tags = element.tags || {};
 
-    for (const element of data.elements || []) {
-      const name = element.tags?.name;
+        return {
+          osm_id: element.id,
+          name: tags.name || "Unnamed Road",
+          road_type: tags.highway || null,
 
-      if (!name) continue;
-
-      const road = {
-        osm_id: element.id,
-        name,
-        road_type: element.tags?.highway || null,
-        geometry: (element.geometry || []).map((point) => ({
-          latitude: point.lat,
-          longitude: point.lon,
-        })),
-      };
-
-      if (!roadsMap.has(name)) {
-        roadsMap.set(name, road);
-      }
-    }
-
-    const roads = Array.from(roadsMap.values());
+          geometry: element.geometry.map((point) => ({
+            latitude: point.lat,
+            longitude: point.lon,
+          })),
+        };
+      });
 
     res.json({
       success: true,
