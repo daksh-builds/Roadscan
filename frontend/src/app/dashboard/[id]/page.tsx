@@ -329,7 +329,7 @@ export default function InspectionDetails({
           height: `${((y2 - y1) / 640) * 100}%`,
         }}
       >
-        <span className="absolute -top-6 left-0 bg-red-500 px-1 text-xs text-white">
+        <span className="absolute -top-6 left-0 whitespace-nowrap rounded bg-yellow-400 px-2 py-1 text-[10px] font-semibold text-white">
           {defect.defect_type}
         </span>
       </div>
