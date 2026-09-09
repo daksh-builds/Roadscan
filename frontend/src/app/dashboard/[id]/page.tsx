@@ -35,6 +35,7 @@ type Defect = {
   image_path?: string;
   latitude?: number;
   longitude?: number;
+  bbox?: number[];
 };
 
 type Repair = {
@@ -303,13 +304,38 @@ export default function InspectionDetails({
               Road Image
             </h2>
 
-            <img
-              src={getImageUrl(
-                inspection.image_path
-              )}
-              alt="Inspected road"
-              className="w-full rounded-xl object-cover"
-            />
+        <div className="relative w-full overflow-hidden rounded-xl">
+  <img
+    src={getImageUrl(inspection.image_path)}
+    alt="Inspected road"
+    className="block w-full h-auto"
+  />
+
+  {defects.map((defect) => {
+    if (!defect.bbox || defect.bbox.length !== 4) {
+      return null;
+    }
+
+    const [x1, y1, x2, y2] = defect.bbox;
+
+    return (
+      <div
+        key={defect.id}
+        className="absolute border-2 border-red-500"
+        style={{
+          left: `${(x1 / 640) * 100}%`,
+          top: `${(y1 / 640) * 100}%`,
+          width: `${((x2 - x1) / 640) * 100}%`,
+          height: `${((y2 - y1) / 640) * 100}%`,
+        }}
+      >
+        <span className="absolute -top-6 left-0 bg-red-500 px-1 text-xs text-white">
+          {defect.defect_type}
+        </span>
+      </div>
+    );
+  })}
+</div>
 
           </div>
 

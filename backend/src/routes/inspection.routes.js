@@ -109,9 +109,10 @@ router.post("/", async (req, res) => {
           priority_score,
           latitude,
           longitude,
-          status
+          status,
+          bbox
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8,$9)
         RETURNING *
         `,
         [
@@ -123,6 +124,9 @@ router.post("/", async (req, res) => {
           latitude || null,
           longitude || null,
           "detected",
+          detection.bbox
+            ? JSON.stringify(detection.bbox)
+            : null,
         ]
       );
 
