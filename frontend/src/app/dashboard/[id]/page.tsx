@@ -321,7 +321,7 @@ export default function InspectionDetails({
     return (
       <div
         key={defect.id}
-        className="absolute border-2 border-red-500"
+       className="absolute border-2 border-yellow-400"
         style={{
           left: `${(x1 / 640) * 100}%`,
           top: `${(y1 / 640) * 100}%`,
