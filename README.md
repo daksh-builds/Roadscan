@@ -1,66 +1,85 @@
-AI-powered road inspection and maintenance platform that detects road defects from images, calculates severity and priority, and helps track inspections and repairs.
 
-Features
-AI-based road defect detection using YOLO
-Detects potholes and different types of road cracks
-Bounding-box visualization for detected defects
-Automatic severity scoring
-Priority scoring: Urgent, High, Medium, Low
-GPS-based road inspections
-OpenStreetMap nearby-road detection
-Defect and road visualization on maps
-Inspection history
-Repair assignment and tracking
-Tech Stack
 
-Frontend
+# 🚧 ROADSCAN
 
-Next.js
-TypeScript
-Tailwind CSS
+AI-powered road inspection and maintenance platform that detects road defects from images, calculates their severity and priority, and helps track inspections and repairs.
 
-Backend
+---
 
-Node.js
-Express.js
-PostgreSQL
+## ✨ Features
 
-AI
+- 🤖 AI-based road defect detection using YOLO
+- 🕳️ Detects potholes and different types of road cracks
+- 📦 Bounding-box visualization for detected defects
+- 📊 Automatic severity scoring
+- 🚨 Priority scoring: Urgent, High, Medium, Low
+- 📍 GPS-based road inspections
+- 🗺️ OpenStreetMap nearby-road detection
+- 📌 Defect and road visualization on maps
+- 📋 Inspection history
+- 🔧 Repair assignment and tracking
 
-Python
-FastAPI
-Ultralytics YOLO
+---
 
-Mapping
+## 🛠️ Tech Stack
 
-OpenStreetMap
-OpenStreetMap Overpass API
-Browser Geolocation API
-Architecture
-User
- │
- ▼
-Next.js Frontend
- │
- ▼
-Express.js Backend
- │
- ├── PostgreSQL
- │
- └── FastAPI AI Service
-        │
-        ▼
-      YOLO Model
-        │
-        ▼
-   Defect Detection
-        │
-        ▼
- Severity + Priority
-        │
-        ▼
-    PostgreSQL
-Project Structure
+### Frontend
+
+- Next.js
+- TypeScript
+- Tailwind CSS
+
+### Backend
+
+- Node.js
+- Express.js
+- PostgreSQL
+
+### AI
+
+- Python
+- FastAPI
+- Ultralytics YOLO
+
+### Mapping
+
+- OpenStreetMap
+- OpenStreetMap Overpass API
+- Browser Geolocation API
+
+---
+
+## 🏗️ Architecture
+
+```text
+                    ┌─────────────────┐
+                    │      User       │
+                    └────────┬────────┘
+                             │
+                             ▼
+                    ┌─────────────────┐
+                    │ Next.js Frontend│
+                    └────────┬────────┘
+                             │
+                             ▼
+                    ┌─────────────────┐
+                    │ Express Backend │
+                    └──────┬─────┬────┘
+                           │     │
+                 ┌─────────┘     └─────────┐
+                 ▼                         ▼
+        ┌─────────────────┐       ┌─────────────────┐
+        │   PostgreSQL    │       │  FastAPI + YOLO │
+        └─────────────────┘       └────────┬────────┘
+                                           │
+                                           ▼
+                                  ┌─────────────────┐
+                                  │ Defect Detection │
+                                  └────────┬────────┘
+                                           │
+                                           ▼
+                                  Severity + Priority
+📁 Project Structure
 ROADSCAN/
 │
 ├── frontend/
@@ -84,29 +103,39 @@ ROADSCAN/
 │   └── requirements.txt
 │
 └── README.md
-How It Works
-Upload Road Image
-       ↓
-AI Detection
-       ↓
-Detect Defects
-       ↓
+🔄 How It Works
+Road Image
+    │
+    ▼
+Upload Image
+    │
+    ▼
+YOLO Defect Detection
+    │
+    ▼
+Detect Potholes / Cracks
+    │
+    ▼
 Calculate Severity
-       ↓
+    │
+    ▼
 Calculate Priority
-       ↓
-Save to PostgreSQL
-       ↓
-Display on Dashboard + Map
-       ↓
+    │
+    ▼
+Store in PostgreSQL
+    │
+    ▼
+Display on Dashboard & Map
+    │
+    ▼
 Assign & Track Repairs
-Run Locally
+🚀 Run Locally
 1. Frontend
 cd frontend
 npm install
 npm run dev
 
-Runs on:
+Frontend:
 
 http://localhost:3000
 2. Backend
@@ -114,7 +143,7 @@ cd backend
 npm install
 npm start
 
-Runs on:
+Backend:
 
 http://localhost:5000
 3. AI Service
@@ -122,38 +151,46 @@ cd ai-service
 pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 
-Runs on:
+AI Service:
 
 http://localhost:8000
-Environment Variables
+🔐 Environment Variables
 Backend
 PORT=5000
 DATABASE_URL=your_postgresql_connection_string
 AI_SERVICE_URL=http://localhost:8000
 Frontend
 NEXT_PUBLIC_API_URL=http://localhost:5000
-AI Model
+🤖 AI Model
 
-ROADSCAN uses a custom-trained YOLO model for detecting:
+ROADSCAN uses a custom-trained YOLO model to detect:
 
 Potholes
 Alligator cracks
 Longitudinal cracks
 Transverse cracks
 
-The detected defects are used to calculate severity and priority before being stored in the database.
+Each detection provides:
 
-Deployment
+Defect type
+Confidence
+Bounding box
+Severity
+Priority score
 
-The project can be deployed as three services:
+🌍 Deployment
 
-Frontend → Vercel
-Backend  → Render
-AI       → Render
-Database → PostgreSQL / Neon
+The application can be deployed as separate services:
 
-For local development, all services can also run directly on the machine.
+Service	Technology
+Frontend	Vercel
+Backend	Render
+AI Service	Render
+Database	PostgreSQL / Neon
+📌 Project Goal
 
-License
+ROADSCAN aims to make road inspection faster and more data-driven by combining computer vision, GPS, mapping, and automated prioritization into a single platform.
+
+📄 License
 
 This project was developed as a hackathon project.
